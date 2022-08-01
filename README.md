@@ -1,7 +1,6 @@
 # promote-module (in progress)
 
-This Lens Protocol module allows you to create a Transparent Promotion system in which the post creator can add a reward for those who mirror (or comment) it.
-Moreover it will specify one or more profiles (ex: influencers) that in case of mirroring (or commenting) it, they will receive a reward.
+This Lens Protocol module allows you to create a Transparent Promotion system in which the post creator can add a reward for who (ex: influencers) mirror it. 
 
 &nbsp;
 
