@@ -63,7 +63,7 @@ contract PromoteModule is IReferenceModule {
             reward.collected = true;
             address token = reward.token;
             uint256 amount = reward.amount;
-            IERC20(token).transfer(IERC721(hub).ownerOf(_profileId), reward.amount);
+            IERC20(token).transfer(IERC721(hub).ownerOf(_profileId), amount);
             emit RewardCollected(_pubIdPointed, _profileId, _profileIdPointed, token, amount);
         }
     }
