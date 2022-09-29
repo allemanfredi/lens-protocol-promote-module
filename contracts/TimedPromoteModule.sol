@@ -40,10 +40,10 @@ contract TimedPromoteModule is ModuleBase, IReferenceModule {
             (address[], uint256[], uint256[], uint64[])
         );
 
-        for (uint256 i = 0; i < tokens.length;) {
-            IERC20(tokens[i]).transferFrom(IERC721(HUB).ownerOf(_profileId), address(this),  amounts[i]);
-            rewards[collectorProfileIds[i]][_pubId] = Reward(tokens[i],  amounts[i], endTimestamps[i], false);
-            emit Promoted(_pubId, _profileId, collectorProfileIds[i], tokens[i],  amounts[i], endTimestamps[i]);
+        for (uint256 i = 0; i < tokens.length; ) {
+            IERC20(tokens[i]).transferFrom(IERC721(HUB).ownerOf(_profileId), address(this), amounts[i]);
+            rewards[collectorProfileIds[i]][_pubId] = Reward(tokens[i], amounts[i], endTimestamps[i], false);
+            emit Promoted(_pubId, _profileId, collectorProfileIds[i], tokens[i], amounts[i], endTimestamps[i]);
             unchecked {
                 i++;
             }
