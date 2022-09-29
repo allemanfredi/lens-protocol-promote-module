@@ -34,12 +34,20 @@ contract TimedPromoteModule is ModuleBase, IReferenceModule {
         uint256 _pubId,
         bytes calldata _data
     ) external override onlyHub returns (bytes memory) {
-        // TODO: handles multiple redeemers with different amounts ecc ecc ...
-        (address token, uint256 amount, uint256 collectorProfileId, uint64 endTimestamp) = abi.decode(_data, (address, uint256, uint256, uint64));
-        IERC20(token).transferFrom(IERC721(HUB).ownerOf(_profileId), address(this), amount);
+        // NOTE: at the moment collectorProfileIds MUST not have duplicates
+        (address[] memory tokens, uint256[] memory amounts, uint256[] memory collectorProfileIds, uint64[] memory endTimestamps) = abi.decode(
+            _data,
+            (address[], uint256[], uint256[], uint64[])
+        );
 
-        rewards[collectorProfileId][_pubId] = Reward(token, amount, endTimestamp, false);
-        emit Promoted(_pubId, _profileId, collectorProfileId, token, amount, endTimestamp);
+        for (uint256 i = 0; i < tokens.length;) {
+            IERC20(tokens[i]).transferFrom(IERC721(HUB).ownerOf(_profileId), address(this),  amounts[i]);
+            rewards[collectorProfileIds[i]][_pubId] = Reward(tokens[i],  amounts[i], endTimestamps[i], false);
+            emit Promoted(_pubId, _profileId, collectorProfileIds[i], tokens[i],  amounts[i], endTimestamps[i]);
+            unchecked {
+                i++;
+            }
+        }
         return new bytes(0);
     }
 

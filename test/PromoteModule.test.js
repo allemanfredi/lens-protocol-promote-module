@@ -5,15 +5,17 @@ const { snapshot } = require('./utils/SnapshotManager')
 
 use(solidity)
 
-let promoteModule, lensHub, creator, influencer, governance, creatorProfileId
+let promoteModule, lensHub, creator, influencer1, influencer2, governance, creatorProfileId
 
 const LENS_HUB_ADDRESS = '0xDb46d1Dc155634FbC732f92E853b10B288AD5a1d'
 const INTERACTION_LOGIC_ADDRESS = '0xb05BAe098D2b0E3048DE27F1931E50b0200a043B'
 const PROFILE_TOKEN_URI_LOGIC_ADDRESS = '0x3FA902A571E941dCAc6081d57917994DDB0F9A9d'
 const PUBLISHING_LOGIC_ADDRESS = '0x7f9bfF8493F821111741b93429A6A6F79DC546F0'
 const MOCK_URI = 'https://ipfs.io/ipfs/QmbWqxBEKC3P8tqsKc98xmWNzrzDtRLMiMPL8wBuTGsMnR'
-const INFLUENCER_ADDRESS = '0x2E21f5d32841cf8C7da805185A041400bF15f21A'
-const INFLUENCER_PROFILE_ID = 5
+const INFLUENCER_1_ADDRESS = '0x8eC94086A724cbEC4D37097b8792cE99CaDCd520'
+const INFLUENCER_2_ADDRESS = '0x5c3fa65c3eb57f83c67f947321ac5969e72ed44d'
+const INFLUENCER_1_PROFILE_ID = 36
+const INFLUENCER_2_PROFILE_ID = 3973
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const FREE_COLLECT_MODULE_ADDRESS = '0x23b9467334bEb345aAa6fd1545538F3d54436e96'
 const GOVERNANCE_ADDRESS = '0xf94b90bbeee30996019babd12cecddccf68331de'
@@ -41,7 +43,8 @@ describe('PromoteModule', () => {
     promoteModule = await PromoteModule.deploy(LENS_HUB_ADDRESS)
     lensHub = await LensHub.attach(LENS_HUB_ADDRESS)
     wmatic = await ERC20.attach(WMATIC_ADDRESS)
-    influencer = await ethers.getImpersonatedSigner(INFLUENCER_ADDRESS)
+    influencer1 = await ethers.getImpersonatedSigner(INFLUENCER_1_ADDRESS)
+    influencer2 = await ethers.getImpersonatedSigner(INFLUENCER_2_ADDRESS)
     governance = await ethers.getImpersonatedSigner(GOVERNANCE_ADDRESS)
     zero = await ethers.getImpersonatedSigner(ZERO_ADDRESS)
 
@@ -86,15 +89,39 @@ describe('PromoteModule', () => {
         collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
         referenceModule: promoteModule.address,
         referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256', 'uint256'],
-          [WMATIC_ADDRESS, amount, INFLUENCER_PROFILE_ID]
+          ['address[]', 'uint256[]', 'uint256[]'],
+          [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
         ),
       })
     ).to.emit(promoteModule, 'Promoted')
   })
 
+  it('should be able to promote a publication by setting 2 addresses', async () => {
+    const amount = ethers.utils.parseEther('1')
+    await wmatic.connect(creator).approve(promoteModule.address, amount.mul(2))
+    await expect(
+      lensHub.connect(creator).post({
+        profileId: creatorProfileId,
+        contentURI: MOCK_URI,
+        collectModule: FREE_COLLECT_MODULE_ADDRESS,
+        collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+        referenceModule: promoteModule.address,
+        referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+          ['address[]', 'uint256[]', 'uint256[]'],
+          [
+            [WMATIC_ADDRESS, WMATIC_ADDRESS],
+            [amount, amount],
+            [INFLUENCER_1_PROFILE_ID, INFLUENCER_2_PROFILE_ID],
+          ]
+        ),
+      })
+    )
+      .to.emit(promoteModule, 'Promoted')
+      .and.to.emit(promoteModule, 'Promoted')
+  })
+
   it('should be able to collect a reward', async () => {
-    const balancePre = await wmatic.balanceOf(INFLUENCER_ADDRESS)
+    const balancePre = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
     const amount = ethers.utils.parseEther('1')
     await wmatic.connect(creator).approve(promoteModule.address, amount)
     await lensHub.connect(creator).post({
@@ -104,24 +131,74 @@ describe('PromoteModule', () => {
       collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
       referenceModule: promoteModule.address,
       referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256'],
-        [WMATIC_ADDRESS, amount, INFLUENCER_PROFILE_ID]
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
       ),
     })
 
     await expect(
-      lensHub.connect(influencer).mirror({
-        profileId: INFLUENCER_PROFILE_ID,
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
         profileIdPointed: creatorProfileId,
-        pubIdPointed: 2,
+        pubIdPointed: 3,
         referenceModule: ZERO_ADDRESS,
         referenceModuleInitData: [],
         referenceModuleData: [],
       })
     ).to.emit(promoteModule, 'RewardCollected')
 
-    const balancePost = await wmatic.balanceOf(INFLUENCER_ADDRESS)
+    const balancePost = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
     expect(balancePost).to.be.eq(balancePre.add(amount))
+  })
+
+  it('should be able to collect 2 reward', async () => {
+    const balancePre1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    const balancePre2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    const amount1 = ethers.utils.parseEther('1')
+    const amount2 = ethers.utils.parseEther('2')
+    await wmatic.connect(creator).approve(promoteModule.address, amount1.add(amount2))
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [
+          [WMATIC_ADDRESS, WMATIC_ADDRESS],
+          [amount1, amount2],
+          [INFLUENCER_1_PROFILE_ID, INFLUENCER_2_PROFILE_ID],
+        ]
+      ),
+    })
+
+    await expect(
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 4,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.emit(promoteModule, 'RewardCollected')
+
+    await expect(
+      lensHub.connect(influencer2).mirror({
+        profileId: INFLUENCER_2_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 4,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.emit(promoteModule, 'RewardCollected')
+
+    const balancePost1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    expect(balancePost1).to.be.eq(balancePre1.add(amount1))
+    const balancePost2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    expect(balancePost2).to.be.eq(balancePre2.add(amount2))
   })
 
   it('should not be able to collect a reward twice', async () => {
@@ -134,16 +211,16 @@ describe('PromoteModule', () => {
       collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
       referenceModule: promoteModule.address,
       referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256'],
-        [WMATIC_ADDRESS, amount, INFLUENCER_PROFILE_ID]
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
       ),
     })
 
     await expect(
-      lensHub.connect(influencer).mirror({
-        profileId: INFLUENCER_PROFILE_ID,
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
         profileIdPointed: creatorProfileId,
-        pubIdPointed: 3,
+        pubIdPointed: 5,
         referenceModule: ZERO_ADDRESS,
         referenceModuleInitData: [],
         referenceModuleData: [],
@@ -151,10 +228,10 @@ describe('PromoteModule', () => {
     ).to.emit(promoteModule, 'RewardCollected')
 
     await expect(
-      lensHub.connect(influencer).mirror({
-        profileId: INFLUENCER_PROFILE_ID,
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
         profileIdPointed: creatorProfileId,
-        pubIdPointed: 3,
+        pubIdPointed: 5,
         referenceModule: ZERO_ADDRESS,
         referenceModuleInitData: [],
         referenceModuleData: [],
