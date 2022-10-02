@@ -293,4 +293,35 @@ describe('TimedPromoteModule', () => {
       })
     ).to.not.emit(timedPromoteModule, 'RewardCollected')
   })
+
+  it('should be able to mirror without earning anything', async () => {
+    const amount = ethers.utils.parseEther('1')
+    const timestamp = parseInt(new Date().getTime() / 1000) * 60 * 60 * 2
+    await wmatic.connect(creator).approve(timedPromoteModule.address, amount)
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: timedPromoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]', 'uint64[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID], [timestamp]]
+      ),
+    })
+
+    await ethers.provider.send('evm_setNextBlockTimestamp', [timestamp + 1000])
+    await ethers.provider.send('evm_mine')
+
+    await expect(
+      lensHub.connect(influencer2).mirror({
+        profileId: INFLUENCER_2_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 7,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.not.emit(timedPromoteModule, 'RewardCollected')
+  })
 })

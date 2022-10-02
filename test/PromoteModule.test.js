@@ -238,4 +238,31 @@ describe('PromoteModule', () => {
       })
     ).to.not.emit(promoteModule, 'RewardCollected')
   })
+
+  it('should be able to mirror without earning anything', async () => {
+    const amount = ethers.utils.parseEther('1')
+    await wmatic.connect(creator).approve(promoteModule.address, amount)
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
+      ),
+    })
+
+    await expect(
+      lensHub.connect(influencer2).mirror({
+        profileId: INFLUENCER_2_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 6,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.not.emit(promoteModule, 'RewardCollected')
+  })
 })

@@ -5,13 +5,15 @@ import {IReferenceModule} from "@aave/lens-protocol/contracts/interfaces/IRefere
 import {ModuleBase} from "@aave/lens-protocol/contracts/core/modules/ModuleBase.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {Errors} from "./libraries/Errors.sol";
+import {Constants} from "./libraries/Constants.sol";
 
 contract TimedPromoteModule is ModuleBase, IReferenceModule {
     struct Reward {
         address token;
         uint256 amount;
         uint256 endTimestamp;
-        bool collected;
+        uint8 status;
     }
 
     mapping(uint256 => mapping(uint256 => Reward)) public rewards;
@@ -41,8 +43,9 @@ contract TimedPromoteModule is ModuleBase, IReferenceModule {
         );
 
         for (uint256 i = 0; i < tokens.length; ) {
+            if (amounts[i] == 0) revert Errors.InvalidAmount();
             IERC20(tokens[i]).transferFrom(IERC721(HUB).ownerOf(_profileId), address(this), amounts[i]);
-            rewards[collectorProfileIds[i]][_pubId] = Reward(tokens[i], amounts[i], endTimestamps[i], false);
+            rewards[collectorProfileIds[i]][_pubId] = Reward(tokens[i], amounts[i], endTimestamps[i], Constants.NOT_COLLECTED);
             emit Promoted(_pubId, _profileId, collectorProfileIds[i], tokens[i], amounts[i], endTimestamps[i]);
             unchecked {
                 i++;
@@ -65,8 +68,8 @@ contract TimedPromoteModule is ModuleBase, IReferenceModule {
         bytes calldata /*_data*/
     ) external override onlyHub {
         Reward storage reward = rewards[_profileId][_pubIdPointed];
-        if (block.timestamp <= reward.endTimestamp && reward.collected == false) {
-            reward.collected = true;
+        if (block.timestamp <= reward.endTimestamp && reward.status == Constants.NOT_COLLECTED) {
+            reward.status = Constants.COLLECTED;
             address token = reward.token;
             uint256 amount = reward.amount;
             IERC20(token).transfer(IERC721(HUB).ownerOf(_profileId), amount);
