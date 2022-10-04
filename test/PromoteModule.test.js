@@ -74,7 +74,7 @@ describe('PromoteModule', () => {
 
     await creator.sendTransaction({
       to: WMATIC_ADDRESS,
-      value: ethers.utils.parseEther('10'),
+      value: ethers.utils.parseEther('30'),
     })
   })
 
@@ -151,7 +151,7 @@ describe('PromoteModule', () => {
     expect(balancePost).to.be.eq(balancePre.add(amount))
   })
 
-  it('should be able to collect 2 reward', async () => {
+  it('should be able to collect 2 rewards', async () => {
     const balancePre1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
     const balancePre2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
     const amount1 = ethers.utils.parseEther('1')
@@ -264,5 +264,187 @@ describe('PromoteModule', () => {
         referenceModuleData: [],
       })
     ).to.not.emit(promoteModule, 'RewardCollected')
+  })
+
+  it('should not be able to get a reward if it has been deleted', async () => {
+    const amount = ethers.utils.parseEther('1')
+    await wmatic.connect(creator).approve(promoteModule.address, amount)
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
+      ),
+    })
+
+    await expect(promoteModule.deleteRewards(INFLUENCER_1_PROFILE_ID, 7)).to.emit(promoteModule, 'RewardDeleted')
+
+    await expect(
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 7,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.not.emit(promoteModule, 'RewardCollected')
+  })
+
+  it('should be able to collect only 1 reward because 1 has been deleted', async () => {
+    const balancePre1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    const balancePre2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    const amount1 = ethers.utils.parseEther('1')
+    const amount2 = ethers.utils.parseEther('2')
+    await wmatic.connect(creator).approve(promoteModule.address, amount1.add(amount2))
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [
+          [WMATIC_ADDRESS, WMATIC_ADDRESS],
+          [amount1, amount2],
+          [INFLUENCER_1_PROFILE_ID, INFLUENCER_2_PROFILE_ID],
+        ]
+      ),
+    })
+
+    await expect(
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 8,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.emit(promoteModule, 'RewardCollected')
+
+    await expect(promoteModule.deleteRewards(INFLUENCER_2_PROFILE_ID, 8)).to.emit(promoteModule, 'RewardDeleted')
+
+    await expect(
+      lensHub.connect(influencer2).mirror({
+        profileId: INFLUENCER_2_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 8,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.not.emit(promoteModule, 'RewardCollected')
+
+    const balancePost1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    expect(balancePost1).to.be.eq(balancePre1.add(amount1))
+    const balancePost2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    expect(balancePost2).to.be.eq(balancePre2)
+  })
+
+  it('should be able to collect 1 reward after that 1 has been deleted', async () => {
+    const balancePre1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    const balancePre2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    const amount1 = ethers.utils.parseEther('1')
+    const amount2 = ethers.utils.parseEther('2')
+    await wmatic.connect(creator).approve(promoteModule.address, amount1.add(amount2))
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [
+          [WMATIC_ADDRESS, WMATIC_ADDRESS],
+          [amount1, amount2],
+          [INFLUENCER_1_PROFILE_ID, INFLUENCER_2_PROFILE_ID],
+        ]
+      ),
+    })
+
+    await expect(
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 9,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.emit(promoteModule, 'RewardCollected')
+
+    await expect(promoteModule.deleteRewards(INFLUENCER_2_PROFILE_ID, 9)).to.emit(promoteModule, 'RewardDeleted')
+
+    await expect(
+      lensHub.connect(influencer2).mirror({
+        profileId: INFLUENCER_2_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 9,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.not.emit(promoteModule, 'RewardCollected')
+
+    const balancePost1 = await wmatic.balanceOf(INFLUENCER_1_ADDRESS)
+    expect(balancePost1).to.be.eq(balancePre1.add(amount1))
+    const balancePost2 = await wmatic.balanceOf(INFLUENCER_2_ADDRESS)
+    expect(balancePost2).to.be.eq(balancePre2)
+  })
+
+  it('should not be able to delete a reward if it has been already collected', async () => {
+    const amount = ethers.utils.parseEther('1')
+    await wmatic.connect(creator).approve(promoteModule.address, amount)
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
+      ),
+    })
+
+    await expect(
+      lensHub.connect(influencer1).mirror({
+        profileId: INFLUENCER_1_PROFILE_ID,
+        profileIdPointed: creatorProfileId,
+        pubIdPointed: 10,
+        referenceModule: ZERO_ADDRESS,
+        referenceModuleInitData: [],
+        referenceModuleData: [],
+      })
+    ).to.emit(promoteModule, 'RewardCollected')
+
+    await expect(promoteModule.deleteRewards(INFLUENCER_1_PROFILE_ID, 10)).to.not.emit(promoteModule, 'RewardDeleted')
+  })
+
+  it('should not be able to delete a reward created by another user', async () => {
+    const amount = ethers.utils.parseEther('1')
+    await wmatic.connect(creator).approve(promoteModule.address, amount)
+    await lensHub.connect(creator).post({
+      profileId: creatorProfileId,
+      contentURI: MOCK_URI,
+      collectModule: FREE_COLLECT_MODULE_ADDRESS,
+      collectModuleInitData: ethers.utils.defaultAbiCoder.encode(['bool'], [true]),
+      referenceModule: promoteModule.address,
+      referenceModuleInitData: ethers.utils.defaultAbiCoder.encode(
+        ['address[]', 'uint256[]', 'uint256[]'],
+        [[WMATIC_ADDRESS], [amount], [INFLUENCER_1_PROFILE_ID]]
+      ),
+    })
+
+    expect(promoteModule.connect(influencer1).deleteRewards(INFLUENCER_1_PROFILE_ID, 11)).to.be.revertedWith(
+      'InvalidAddress'
+    )
   })
 })
